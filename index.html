@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16232B">
+<title>Weekly planner</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16232B; --ink-soft:#5A6B72; --paper:#E7EBE9; --surface:#FFFFFF;
+    --line:#CFD8D5; --accent:#0F6E6E; --today:#8E3B5E; --done:#8A9A9E;
+    --radius:3px; --gap:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);
+    font-family:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums;
+    padding:max(18px,env(safe-area-inset-top)) 20px 60px}
+  .wrap{max-width:1180px;margin:0 auto}
+
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px 28px;margin-bottom:18px}
+  .range{font-size:30px;font-weight:800;letter-spacing:-.025em;line-height:1.05;margin:0}
+  .range span{font-weight:400;color:var(--ink-soft)}
+  .nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  button{font-family:inherit;font-size:14px;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);padding:6px 11px;cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .nav .arrow{width:32px;padding:6px 0;font-weight:600}
+
+  .pulse{margin-left:auto;display:flex;align-items:flex-end;gap:16px}
+  .score{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:.9}
+  .score small{font-size:13px;font-weight:500;color:var(--ink-soft);letter-spacing:0;display:block;margin-top:6px}
+  .bars{display:flex;align-items:flex-end;gap:5px;height:54px}
+  .bar{width:16px;background:var(--line);border-radius:1px;display:flex;flex-direction:column-reverse;min-height:3px}
+  .bar i{display:block;background:var(--accent);border-radius:1px}
+  .bar.is-today{outline:1.5px solid var(--today);outline-offset:2px}
+
+  /* sync strip */
+  .sync{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);padding:7px 10px;margin-bottom:12px;
+    font-size:13px;color:var(--ink-soft)}
+  .sync .dot{width:8px;height:8px;border-radius:50%;background:var(--line);flex:0 0 auto}
+  .sync.on .dot{background:var(--accent)}
+  .sync.err .dot{background:var(--today)}
+  .sync .spacer{flex:1}
+  .sync button{font-size:13px;padding:4px 9px}
+
+  .compose{display:flex;flex-wrap:wrap;gap:8px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:9px;margin-bottom:20px}
+  .compose input[type=text]{flex:1 1 300px;min-width:0;border:0;background:transparent;font:inherit;color:inherit;padding:6px 8px}
+  .compose input[type=text]::placeholder{color:var(--ink-soft)}
+  .compose input:focus{outline:none}
+  select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:var(--radius);padding:6px 8px}
+  .compose .add{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600;padding:6px 16px}
+  .compose .add:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .week{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--gap)}
+  .day{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    display:flex;flex-direction:column;min-height:190px}
+  .day.drop{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .day > h2{margin:0;padding:9px 10px 7px;border-bottom:1px solid var(--line);font-size:13px;
+    font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .day h2 b{font-weight:800;font-size:15px}
+  .day h2 em{font-style:normal;color:var(--ink-soft);font-weight:400}
+  .day.today h2{background:var(--today);border-color:var(--today);color:#fff}
+  .day.today h2 em{color:#F0D6E0}
+  ul{list-style:none;margin:0;padding:5px;flex:1;display:flex;flex-direction:column;gap:3px}
+  .empty{color:var(--ink-soft);font-size:12.5px;padding:8px 6px;margin:auto 0}
+
+  li{display:flex;align-items:flex-start;gap:7px;padding:5px 4px 5px 6px;border-radius:var(--radius);
+    border-left:3px solid var(--tag,var(--line));cursor:grab;background:var(--surface)}
+  li:hover{background:#F4F7F6}
+  li.dragging{opacity:.4}
+  li .box{flex:0 0 17px;height:17px;margin-top:1px;border:1.5px solid var(--ink-soft);border-radius:2px;
+    background:transparent;padding:0;cursor:pointer;position:relative}
+  li .box:hover{border-color:var(--accent)}
+  li .box::after{content:"";position:absolute;inset:2px;border-radius:1px;background:transparent}
+  li.done .box{border-color:var(--accent)}
+  li.done .box::after{background:var(--accent)}
+  li .title{flex:1;font-size:13.5px;line-height:1.35;word-break:break-word;border:0;background:transparent;
+    font-family:inherit;padding:0;cursor:text}
+  li .title:focus{outline:1px dotted var(--accent);outline-offset:2px}
+  li.done .title{color:var(--done);text-decoration:line-through}
+  li .kill{flex:0 0 auto;border:0;background:none;color:var(--ink-soft);font-size:16px;line-height:1;
+    padding:1px 4px;opacity:0;cursor:pointer}
+  li:hover .kill,li .kill:focus-visible{opacity:1}
+  li .kill:hover{color:var(--today)}
+
+  .shelf{margin-top:var(--gap);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+  .shelf.drop{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .shelf h2{margin:0;padding:9px 10px 7px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+  .shelf ul{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:3px}
+
+  footer{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:18px;font-size:12.5px;color:var(--ink-soft)}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-left:auto}
+  .legend b{font-weight:500;display:flex;align-items:center;gap:5px}
+  .legend i{width:9px;height:9px;border-radius:2px;display:block}
+
+  dialog{border:1px solid var(--line);border-radius:var(--radius);padding:20px;max-width:440px;
+    color:var(--ink);font-family:inherit;background:var(--surface)}
+  dialog::backdrop{background:rgba(22,35,43,.45)}
+  dialog h3{margin:0 0 8px;font-size:17px}
+  dialog p{margin:0 0 12px;font-size:13.5px;color:var(--ink-soft);line-height:1.5}
+  dialog input{width:100%;font:inherit;font-size:13px;padding:8px;border:1px solid var(--line);
+    border-radius:var(--radius);margin-bottom:12px}
+  dialog .row{display:flex;gap:8px;justify-content:flex-end}
+
+  @media (max-width:900px){
+    body{padding:14px 12px 50px}
+    .range{font-size:24px}
+    .pulse{margin-left:0;width:100%;justify-content:space-between}
+    .week{grid-template-columns:1fr}
+    .day{min-height:0}
+    .day:not(.today):not(.has-tasks) ul{display:none}
+    li .kill{opacity:1}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    li .kill{transition:opacity .12s}
+    .bar i{transition:height .2s}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="sync" id="syncbar">
+    <span class="dot"></span>
+    <span id="syncmsg">Working on this device only</span>
+    <span class="spacer"></span>
+    <button id="connect">Connect Google Drive</button>
+    <button id="signout" hidden>Disconnect</button>
+  </div>
+
+  <header>
+    <div>
+      <h1 class="range" id="range">Loading…</h1>
+      <div class="nav">
+        <button class="arrow" id="prev" title="Previous week">‹</button>
+        <button id="thisweek">This week</button>
+        <button class="arrow" id="next" title="Next week">›</button>
+        <button id="rollover">Roll unfinished forward</button>
+      </div>
+    </div>
+    <div class="pulse">
+      <div class="score" id="score">0/0<small id="scorelabel">tasks done this week</small></div>
+      <div class="bars" id="bars"></div>
+    </div>
+  </header>
+
+  <div class="compose">
+    <input type="text" id="newtask" placeholder="What needs doing? (e.g. grade lab reports)" autocomplete="off">
+    <select id="newday"></select>
+    <select id="newtag"></select>
+    <button class="add" id="add">Add task</button>
+  </div>
+
+  <div class="week" id="week"></div>
+
+  <section class="shelf" id="shelf">
+    <h2>Anytime this week</h2>
+    <ul id="shelflist"></ul>
+  </section>
+
+  <footer>
+    <span>Click a task to rename it. Drag it to another day. Changes save as you go.</span>
+    <div class="legend" id="legend"></div>
+  </footer>
+</div>
+
+<dialog id="setup">
+  <h3>Connect Google Drive</h3>
+  <p>Paste the OAuth client ID from your Google Cloud project. The planner keeps one file,
+     <b>planner-data.json</b>, in your Drive and can only see files it created itself.</p>
+  <input type="text" id="clientid" placeholder="1234567890-abc123.apps.googleusercontent.com" autocomplete="off">
+  <div class="row">
+    <button id="setupcancel">Cancel</button>
+    <button id="setupsave" style="background:var(--ink);color:#fff;border-color:var(--ink)">Save and connect</button>
+  </div>
+</dialog>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+/* ============================================================
+   Weekly planner — local-first, with optional Google Drive sync
+   ============================================================ */
+
+const TAGS = [
+  {id:"teaching", label:"Teaching", color:"#0F6E6E"},
+  {id:"research", label:"Research", color:"#3A5FA8"},
+  {id:"students", label:"Students", color:"#8E3B5E"},
+  {id:"admin",    label:"Admin",    color:"#A8760C"},
+  {id:"personal", label:"Personal", color:"#4B7A45"}
+];
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const LOCAL_KEY = "planner.tasks.v2";
+const CID_KEY   = "planner.clientId";
+const FID_KEY   = "planner.fileId";
+const FILE_NAME = "planner-data.json";
+const SCOPE     = "https://www.googleapis.com/auth/drive.file";
+const TOMBSTONE_DAYS = 30;
+
+let tasks  = [];
+let cursor = mondayOf(new Date());
+let token  = null;
+let tokenClient = null;
+let pushTimer = null;
+
+/* ---------- dates ---------- */
+function mondayOf(d){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay()+6)%7));
+  return x;
+}
+function iso(d){
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function fmtRange(mon){
+  const end = addDays(mon,6);
+  const m = d => d.toLocaleDateString(undefined,{month:"short"});
+  return `${m(mon)} ${mon.getDate()} – ${mon.getMonth()===end.getMonth()?"":m(end)+" "}${end.getDate()}`;
+}
+
+/* ---------- local store ---------- */
+function loadLocal(){
+  try{ tasks = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]"); }
+  catch(e){ tasks = []; }
+}
+function saveLocal(){
+  try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(tasks)); }
+  catch(e){ status("Couldn't save on this device — storage may be full.", "err"); }
+}
+function touch(t){ t.updatedAt = Date.now(); }
+function commit(){ saveLocal(); render(); queuePush(); }
+
+/* ---------- merge (last write per task wins) ---------- */
+function merge(remoteTasks){
+  const byId = new Map(tasks.map(t => [t.id, t]));
+  (remoteTasks || []).forEach(rt => {
+    const lt = byId.get(rt.id);
+    if(!lt || (rt.updatedAt||0) > (lt.updatedAt||0)) byId.set(rt.id, rt);
+  });
+  tasks = [...byId.values()];
+  purge();
+}
+function purge(){
+  const cutoff = Date.now() - TOMBSTONE_DAYS*864e5;
+  tasks = tasks.filter(t => !(t.deleted && (t.updatedAt||0) < cutoff));
+}
+function live(){ return tasks.filter(t => !t.deleted); }
+
+/* ---------- Drive ---------- */
+function status(msg, state){
+  document.getElementById("syncmsg").textContent = msg;
+  const bar = document.getElementById("syncbar");
+  bar.classList.toggle("on",  state === "on");
+  bar.classList.toggle("err", state === "err");
+}
+function clientId(){ return localStorage.getItem(CID_KEY) || ""; }
+
+function initTokenClient(){
+  if(!window.google || !google.accounts || !clientId()) return false;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId(),
+    scope: SCOPE,
+    callback: resp => {
+      if(resp.error){ status("Google sign-in was cancelled.", "err"); return; }
+      token = resp.access_token;
+      document.getElementById("connect").hidden = true;
+      document.getElementById("signout").hidden = false;
+      syncNow();
+    }
+  });
+  return true;
+}
+function connect(){
+  if(!clientId()){ document.getElementById("setup").showModal(); return; }
+  if(!tokenClient && !initTokenClient()){
+    status("Google's sign-in script hasn't loaded. Check your connection.", "err");
+    return;
+  }
+  tokenClient.requestAccessToken({prompt: token ? "" : "consent"});
+}
+function disconnect(){
+  if(token && window.google) google.accounts.oauth2.revoke(token, ()=>{});
+  token = null;
+  localStorage.removeItem(FID_KEY);
+  document.getElementById("connect").hidden = false;
+  document.getElementById("signout").hidden = true;
+  status("Working on this device only");
+}
+
+async function drive(path, opts={}){
+  const r = await fetch("https://www.googleapis.com/" + path, {
+    ...opts,
+    headers: {Authorization: "Bearer " + token, ...(opts.headers||{})}
+  });
+  if(r.status === 401){ token = null; throw new Error("expired"); }
+  if(!r.ok) throw new Error("drive " + r.status);
+  return r;
+}
+async function findFile(){
+  const cached = localStorage.getItem(FID_KEY);
+  if(cached) return cached;
+  const q = encodeURIComponent(`name='${FILE_NAME}' and trashed=false`);
+  const r = await drive(`drive/v3/files?q=${q}&spaces=drive&fields=files(id)`);
+  const j = await r.json();
+  const id = j.files && j.files[0] && j.files[0].id;
+  if(id) localStorage.setItem(FID_KEY, id);
+  return id || null;
+}
+async function pull(){
+  const id = await findFile();
+  if(!id) return null;
+  const r = await drive(`drive/v3/files/${id}?alt=media`);
+  return await r.json();
+}
+async function push(){
+  const body = JSON.stringify({version:2, updatedAt:Date.now(), tasks});
+  let id = localStorage.getItem(FID_KEY);
+  if(id){
+    await drive(`upload/drive/v3/files/${id}?uploadType=media`, {
+      method:"PATCH", headers:{"Content-Type":"application/json"}, body
+    });
+  }else{
+    const boundary = "planner" + Date.now();
+    const meta = JSON.stringify({name:FILE_NAME, mimeType:"application/json"});
+    const payload =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+    const r = await drive(`upload/drive/v3/files?uploadType=multipart&fields=id`, {
+      method:"POST", headers:{"Content-Type":`multipart/related; boundary=${boundary}`}, body:payload
+    });
+    const j = await r.json();
+    localStorage.setItem(FID_KEY, j.id);
+  }
+}
+async function syncNow(){
+  if(!token) return;
+  try{
+    status("Syncing…");
+    const remote = await pull();
+    if(remote) { merge(remote.tasks); saveLocal(); render(); }
+    await push();
+    status("Synced " + new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}), "on");
+  }catch(e){
+    if(e.message === "expired"){ status("Google session expired — tap Connect to resume.", "err");
+      document.getElementById("connect").hidden = false;
+      document.getElementById("signout").hidden = true;
+    } else if(!navigator.onLine){ status("Offline — changes will sync when you reconnect.", "err"); }
+    else { status("Drive sync failed. Your tasks are safe on this device.", "err"); }
+  }
+}
+function queuePush(){
+  if(!token) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(syncNow, 1500);
+}
+
+/* ---------- model ---------- */
+function weekOf(t){ return t.date ? iso(mondayOf(new Date(t.date+"T00:00"))) : t.week; }
+function forWeek(){ const w = iso(cursor); return live().filter(t => weekOf(t) === w); }
+function tagColor(id){ const t = TAGS.find(x=>x.id===id); return t ? t.color : "#CFD8D5"; }
+
+function addTask(title, dayIdx, tag){
+  tasks.push({
+    id: "t" + Date.now() + Math.random().toString(36).slice(2,6),
+    title, tag,
+    date: dayIdx === "" ? null : iso(addDays(cursor, +dayIdx)),
+    week: iso(cursor),
+    done: false,
+    updatedAt: Date.now()
+  });
+  commit();
+}
+
+/* ---------- render ---------- */
+function render(){
+  const today = iso(new Date());
+  const dates = DAYS.map((_,i) => addDays(cursor,i));
+  const mine  = forWeek();
+
+  document.getElementById("range").innerHTML = fmtRange(cursor)+' <span>'+cursor.getFullYear()+'</span>';
+
+  const done = mine.filter(t=>t.done).length;
+  document.getElementById("score").firstChild.nodeValue = done + "/" + mine.length;
+  document.getElementById("scorelabel").textContent =
+    mine.length ? "tasks done this week" : "nothing planned yet";
+
+  const bars = document.getElementById("bars");
+  bars.innerHTML = "";
+  const max = Math.max(3, ...dates.map(d => mine.filter(t=>t.date===iso(d)).length));
+  dates.forEach(d => {
+    const all = mine.filter(t=>t.date===iso(d));
+    const fin = all.filter(t=>t.done).length;
+    const bar = document.createElement("div");
+    bar.className = "bar" + (iso(d)===today ? " is-today" : "");
+    bar.style.height = Math.max(3, Math.round(all.length/max*54)) + "px";
+    bar.title = `${DAYS[(d.getDay()+6)%7]}: ${fin} of ${all.length} done`;
+    const fill = document.createElement("i");
+    fill.style.height = all.length ? Math.round(fin/all.length*100)+"%" : "0";
+    bar.appendChild(fill);
+    bars.appendChild(bar);
+  });
+
+  const week = document.getElementById("week");
+  week.innerHTML = "";
+  dates.forEach((d,i) => {
+    const list = mine.filter(t => t.date === iso(d));
+    const col = document.createElement("div");
+    col.className = "day" + (iso(d)===today?" today":"") + (list.length?" has-tasks":"");
+    col.innerHTML = `<h2><span><b>${DAYS[i]}</b></span><em>${d.getDate()}</em></h2>`;
+    col.appendChild(buildList(list, "Nothing yet"));
+    dropTarget(col, iso(d));
+    week.appendChild(col);
+  });
+
+  const shelf = document.getElementById("shelf");
+  const ul = buildList(mine.filter(t=>!t.date), "Park tasks here when the day isn't decided.");
+  ul.id = "shelflist";
+  shelf.replaceChild(ul, document.getElementById("shelflist"));
+  dropTarget(shelf, null);
+}
+
+function buildList(list, emptyMsg){
+  const ul = document.createElement("ul");
+  if(!list.length){
+    const p = document.createElement("p");
+    p.className = "empty"; p.textContent = emptyMsg;
+    ul.appendChild(p);
+    return ul;
+  }
+  list.sort((a,b)=>(a.done?1:0)-(b.done?1:0));
+  list.forEach(t => ul.appendChild(taskEl(t)));
+  return ul;
+}
+
+function taskEl(t){
+  const li = document.createElement("li");
+  li.className = t.done ? "done" : "";
+  li.draggable = true;
+  li.style.setProperty("--tag", tagColor(t.tag));
+
+  const box = document.createElement("button");
+  box.className = "box";
+  box.setAttribute("aria-label", t.done ? "Mark not done" : "Mark done");
+  box.onclick = () => { t.done = !t.done; touch(t); commit(); };
+
+  const title = document.createElement("div");
+  title.className = "title";
+  title.contentEditable = "true";
+  title.spellcheck = false;
+  title.textContent = t.title;
+  title.onblur = () => {
+    const v = title.textContent.trim();
+    if(!v){ title.textContent = t.title; return; }
+    if(v !== t.title){ t.title = v; touch(t); commit(); }
+  };
+  title.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); title.blur(); } };
+
+  const kill = document.createElement("button");
+  kill.className = "kill"; kill.textContent = "×"; kill.title = "Delete task";
+  kill.onclick = () => { t.deleted = true; touch(t); commit(); };
+
+  li.append(box, title, kill);
+  li.addEventListener("dragstart", e => { e.dataTransfer.setData("text/plain", t.id); li.classList.add("dragging"); });
+  li.addEventListener("dragend", () => li.classList.remove("dragging"));
+  return li;
+}
+
+function dropTarget(el, date){
+  el.addEventListener("dragover", e => { e.preventDefault(); el.classList.add("drop"); });
+  el.addEventListener("dragleave", () => el.classList.remove("drop"));
+  el.addEventListener("drop", e => {
+    e.preventDefault(); el.classList.remove("drop");
+    const t = tasks.find(x => x.id === e.dataTransfer.getData("text/plain"));
+    if(!t) return;
+    t.date = date; t.week = iso(cursor); touch(t); commit();
+  });
+}
+
+/* ---------- controls ---------- */
+function fillSelects(){
+  const day = document.getElementById("newday");
+  day.innerHTML = '<option value="">Anytime</option>' + DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
+  const t = new Date();
+  if(iso(mondayOf(t)) === iso(cursor)) day.value = String((t.getDay()+6)%7);
+  document.getElementById("newtag").innerHTML = TAGS.map(t=>`<option value="${t.id}">${t.label}</option>`).join("");
+  document.getElementById("legend").innerHTML = TAGS.map(t=>`<b><i style="background:${t.color}"></i>${t.label}</b>`).join("");
+}
+function submit(){
+  const input = document.getElementById("newtask");
+  const v = input.value.trim();
+  if(!v){ input.focus(); return; }
+  addTask(v, document.getElementById("newday").value, document.getElementById("newtag").value);
+  input.value = ""; input.focus();
+}
+document.getElementById("add").onclick = submit;
+document.getElementById("newtask").addEventListener("keydown", e => { if(e.key === "Enter") submit(); });
+document.getElementById("prev").onclick = () => { cursor = addDays(cursor,-7); fillSelects(); render(); };
+document.getElementById("next").onclick = () => { cursor = addDays(cursor,7);  fillSelects(); render(); };
+document.getElementById("thisweek").onclick = () => { cursor = mondayOf(new Date()); fillSelects(); render(); };
+document.getElementById("rollover").onclick = () => {
+  const next = addDays(cursor,7);
+  let moved = 0;
+  forWeek().filter(t=>!t.done).forEach(t => {
+    if(t.date) t.date = iso(addDays(new Date(t.date+"T00:00"),7));
+    t.week = iso(next); touch(t); moved++;
+  });
+  if(!moved) return;
+  cursor = next; fillSelects(); commit();
+};
+
+document.getElementById("connect").onclick = connect;
+document.getElementById("signout").onclick = disconnect;
+document.getElementById("setupcancel").onclick = () => document.getElementById("setup").close();
+document.getElementById("setupsave").onclick = () => {
+  const v = document.getElementById("clientid").value.trim();
+  if(!v) return;
+  localStorage.setItem(CID_KEY, v);
+  document.getElementById("setup").close();
+  tokenClient = null;
+  connect();
+};
+
+window.addEventListener("online", syncNow);
+document.addEventListener("visibilitychange", () => { if(!document.hidden) syncNow(); });
+
+/* ---------- boot ---------- */
+(function init(){
+  loadLocal(); purge(); fillSelects(); render();
+  document.getElementById("clientid").value = clientId();
+  if(clientId()){
+    status("Tap Connect to sync with Drive");
+    const wait = setInterval(() => { if(window.google && google.accounts){ clearInterval(wait); initTokenClient(); } }, 300);
+    setTimeout(() => clearInterval(wait), 8000);
+  }
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  }
+})();
+</script>
+</body>
+</html>
