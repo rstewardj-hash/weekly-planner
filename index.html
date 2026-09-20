@@ -176,17 +176,6 @@
   </footer>
 </div>
 
-<dialog id="setup">
-  <h3>Connect Google Drive</h3>
-  <p>Paste the OAuth client ID from your Google Cloud project. The planner keeps one file,
-     <b>planner-data.json</b>, in your Drive and can only see files it created itself.</p>
-  <input type="text" id="clientid" placeholder="1234567890-abc123.apps.googleusercontent.com" autocomplete="off">
-  <div class="row">
-    <button id="setupcancel">Cancel</button>
-    <button id="setupsave" style="background:var(--ink);color:#fff;border-color:var(--ink)">Save and connect</button>
-  </div>
-</dialog>
-
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 /* ============================================================
@@ -202,7 +191,7 @@ const TAGS = [
 ];
 const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const LOCAL_KEY = "planner.tasks.v2";
-const CID_KEY   = "planner.clientId";
+const CLIENT_ID = "128899504441-dbr9kgldiif9l6qgrpbfqvrfmoe0136o.apps.googleusercontent.com";
 const FID_KEY   = "planner.fileId";
 const FILE_NAME = "planner-data.json";
 const SCOPE     = "https://www.googleapis.com/auth/drive.file";
@@ -265,12 +254,11 @@ function status(msg, state){
   bar.classList.toggle("on",  state === "on");
   bar.classList.toggle("err", state === "err");
 }
-function clientId(){ return localStorage.getItem(CID_KEY) || ""; }
 
 function initTokenClient(){
-  if(!window.google || !google.accounts || !clientId()) return false;
+  if(!window.google || !google.accounts) return false;
   tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId(),
+    client_id: CLIENT_ID,
     scope: SCOPE,
     callback: resp => {
       if(resp.error){ status("Google sign-in was cancelled.", "err"); return; }
@@ -283,7 +271,6 @@ function initTokenClient(){
   return true;
 }
 function connect(){
-  if(!clientId()){ document.getElementById("setup").showModal(); return; }
   if(!tokenClient && !initTokenClient()){
     status("Google's sign-in script hasn't loaded. Check your connection.", "err");
     return;
@@ -522,15 +509,6 @@ document.getElementById("rollover").onclick = () => {
 
 document.getElementById("connect").onclick = connect;
 document.getElementById("signout").onclick = disconnect;
-document.getElementById("setupcancel").onclick = () => document.getElementById("setup").close();
-document.getElementById("setupsave").onclick = () => {
-  const v = document.getElementById("clientid").value.trim();
-  if(!v) return;
-  localStorage.setItem(CID_KEY, v);
-  document.getElementById("setup").close();
-  tokenClient = null;
-  connect();
-};
 
 window.addEventListener("online", syncNow);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) syncNow(); });
@@ -538,12 +516,9 @@ document.addEventListener("visibilitychange", () => { if(!document.hidden) syncN
 /* ---------- boot ---------- */
 (function init(){
   loadLocal(); purge(); fillSelects(); render();
-  document.getElementById("clientid").value = clientId();
-  if(clientId()){
-    status("Tap Connect to sync with Drive");
-    const wait = setInterval(() => { if(window.google && google.accounts){ clearInterval(wait); initTokenClient(); } }, 300);
-    setTimeout(() => clearInterval(wait), 8000);
-  }
+  status("Tap Connect to sync with Drive");
+  const wait = setInterval(() => { if(window.google && google.accounts){ clearInterval(wait); initTokenClient(); } }, 300);
+  setTimeout(() => clearInterval(wait), 8000);
   if("serviceWorker" in navigator){
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
   }
