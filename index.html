@@ -255,17 +255,30 @@ function status(msg, state){
   bar.classList.toggle("err", state === "err");
 }
 
+let authWatchdog = null;
+
 function initTokenClient(){
   if(!window.google || !google.accounts) return false;
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPE,
     callback: resp => {
+      clearTimeout(authWatchdog);
+      console.log("Google token response:", resp);
       if(resp.error){ status("Google sign-in was cancelled.", "err"); return; }
+      if(!google.accounts.oauth2.hasGrantedAllScopes(resp, SCOPE)){
+        status("Google didn't grant the Drive permission — tap Connect to try again.", "err");
+        return;
+      }
       token = resp.access_token;
       document.getElementById("connect").hidden = true;
       document.getElementById("signout").hidden = false;
       syncNow();
+    },
+    error_callback: err => {
+      clearTimeout(authWatchdog);
+      console.error("Google token error:", err);
+      status("Google sign-in error: " + (err && err.type ? err.type : "unknown"), "err");
     }
   });
   return true;
@@ -275,6 +288,10 @@ function connect(){
     status("Google's sign-in script hasn't loaded. Check your connection.", "err");
     return;
   }
+  clearTimeout(authWatchdog);
+  authWatchdog = setTimeout(() => {
+    status("No response from Google after 60s — tap Connect to retry.", "err");
+  }, 60000);
   tokenClient.requestAccessToken({prompt: token ? "" : "consent"});
 }
 function disconnect(){
