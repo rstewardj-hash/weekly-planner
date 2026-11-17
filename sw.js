@@ -1,5 +1,5 @@
 /* App-shell cache. Google APIs are never cached — they must always hit the network. */
-const CACHE = "planner-v2";
+const CACHE = "planner-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

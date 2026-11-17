@@ -176,7 +176,6 @@
   </footer>
 </div>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 /* ============================================================
    Weekly planner — local-first, with optional Google Drive sync
@@ -196,11 +195,14 @@ const FID_KEY   = "planner.fileId";
 const FILE_NAME = "planner-data.json";
 const SCOPE     = "https://www.googleapis.com/auth/drive.file";
 const TOMBSTONE_DAYS = 30;
+const REDIRECT_URI = location.origin + location.pathname;
+const STATE_KEY = "planner.oauthState";
+const TOKEN_KEY = "planner.accessToken";
+const TOKEN_EXP_KEY = "planner.tokenExpiry";
 
 let tasks  = [];
 let cursor = mondayOf(new Date());
 let token  = null;
-let tokenClient = null;
 let pushTimer = null;
 
 /* ---------- dates ---------- */
@@ -255,52 +257,63 @@ function status(msg, state){
   bar.classList.toggle("err", state === "err");
 }
 
-let authWatchdog = null;
-
-function initTokenClient(){
-  if(!window.google || !google.accounts) return false;
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPE,
-    callback: resp => {
-      clearTimeout(authWatchdog);
-      console.log("Google token response:", resp);
-      if(resp.error){ status("Google sign-in was cancelled.", "err"); return; }
-      if(!google.accounts.oauth2.hasGrantedAllScopes(resp, SCOPE)){
-        status("Google didn't grant the Drive permission — tap Connect to try again.", "err");
-        return;
-      }
-      token = resp.access_token;
-      document.getElementById("connect").hidden = true;
-      document.getElementById("signout").hidden = false;
-      syncNow();
-    },
-    error_callback: err => {
-      clearTimeout(authWatchdog);
-      console.error("Google token error:", err);
-      status("Google sign-in error: " + (err && err.type ? err.type : "unknown"), "err");
-    }
-  });
-  return true;
+function randomState(){
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map(b => b.toString(16).padStart(2,"0")).join("");
 }
-function connect(){
-  if(!tokenClient && !initTokenClient()){
-    status("Google's sign-in script hasn't loaded. Check your connection.", "err");
-    return;
+
+/* Runs at the very start of init(). Returns true if a fresh token was
+   captured from the redirect hash. */
+function captureToken(){
+  if(!location.hash.includes("access_token")) return false;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const returnedState = params.get("state");
+  const savedState = sessionStorage.getItem(STATE_KEY);
+  sessionStorage.removeItem(STATE_KEY);
+
+  let ok = false;
+  if(!returnedState || returnedState !== savedState){
+    status("Google sign-in failed — state mismatch.", "err");
+  }else{
+    const accessToken = params.get("access_token");
+    const expiresIn = parseInt(params.get("expires_in") || "0", 10);
+    if(accessToken && expiresIn){
+      token = accessToken;
+      sessionStorage.setItem(TOKEN_KEY, accessToken);
+      sessionStorage.setItem(TOKEN_EXP_KEY, String(Date.now() + expiresIn*1000));
+      ok = true;
+    }
   }
-  clearTimeout(authWatchdog);
-  authWatchdog = setTimeout(() => {
-    status("No response from Google after 60s — tap Connect to retry.", "err");
-  }, 60000);
-  tokenClient.requestAccessToken({prompt: token ? "" : "consent"});
+  history.replaceState(null, "", location.pathname + location.search);
+  return ok;
+}
+
+function connect(){
+  const state = randomState();
+  sessionStorage.setItem(STATE_KEY, state);
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: "token",
+    scope: SCOPE,
+    include_granted_scopes: "true",
+    state,
+    prompt: "consent"
+  });
+  location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
 }
 function disconnect(){
-  if(token && window.google) google.accounts.oauth2.revoke(token, ()=>{});
+  const old = token;
   token = null;
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_EXP_KEY);
   localStorage.removeItem(FID_KEY);
   document.getElementById("connect").hidden = false;
   document.getElementById("signout").hidden = true;
   status("Working on this device only");
+  if(old){
+    fetch("https://oauth2.googleapis.com/revoke?token=" + encodeURIComponent(old), {method:"POST"}).catch(()=>{});
+  }
 }
 
 async function drive(path, opts={}){
@@ -532,10 +545,27 @@ document.addEventListener("visibilitychange", () => { if(!document.hidden) syncN
 
 /* ---------- boot ---------- */
 (function init(){
+  const freshToken = captureToken();
   loadLocal(); purge(); fillSelects(); render();
-  status("Tap Connect to sync with Drive");
-  const wait = setInterval(() => { if(window.google && google.accounts){ clearInterval(wait); initTokenClient(); } }, 300);
-  setTimeout(() => clearInterval(wait), 8000);
+
+  if(!freshToken){
+    const savedExp = parseInt(sessionStorage.getItem(TOKEN_EXP_KEY) || "0", 10);
+    if(savedExp && savedExp > Date.now()){
+      token = sessionStorage.getItem(TOKEN_KEY);
+    }else{
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_EXP_KEY);
+    }
+  }
+
+  if(token){
+    document.getElementById("connect").hidden = true;
+    document.getElementById("signout").hidden = false;
+    syncNow();
+  }else{
+    status("Tap Connect to sync with Drive");
+  }
+
   if("serviceWorker" in navigator){
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
   }
